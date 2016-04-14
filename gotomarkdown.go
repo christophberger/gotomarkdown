@@ -31,8 +31,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 const (
@@ -64,7 +62,6 @@ var (
 func copyFiles(dest string, srcpaths map[string]struct{}) (err error) {
 	var result []byte
 	for src, _ := range srcpaths {
-		spew.Println("cp", "-R", path.Clean(strings.Trim(src, " \t")), path.Clean(path.Join(dest, src)))
 		result, err = exec.Command("cp", "-R", path.Clean(strings.Trim(src, " \t")), path.Clean(path.Join(dest, src))).Output() // TODO: Windows "copy"
 		if err != nil {
 			return errors.New(string(result) + "\n" + err.Error())
