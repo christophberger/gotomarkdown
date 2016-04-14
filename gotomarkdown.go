@@ -31,6 +31,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 const (
@@ -38,19 +40,9 @@ const (
 	commentStartPtrn = `^\s*/\*\s?`
 	commentEndPtrn   = `\s?\*/\s*$`
 	directivePtrn    = `^//go:`
-	imagePtrn        = `!\[[^\]]+\]\( *([^"\)]+) *["\)]`
-	hypePtrn         = `HYPE\[[^\]]+\]\( *([^\)]+) *\)`
+	imagePtrn        = `[^\x60]!\[[^\]]+\]\( *([^"\)]+) *["\)]` // \x60 = backtick
+	hypePtrn         = `[^\x60]HYPE\[[^\]]+\]\( *([^\)]+) *\)`
 )
-
-// imagePtrn should properly match:
-//
-// ![Alt text](gotomarkdown_animation.gif)
-//
-// ![Alt text](gotomarkdown_animation.gif "Title")
-//
-// ![Alt text](gotomarkdown image.jpg)
-//
-// ![Alt text](gotomarkdown image.jpg "Title")
 
 var (
 	comment          = regexp.MustCompile(commentPtrn)      // pattern for single-line comments
@@ -69,9 +61,10 @@ var (
 // copyFiles copies a list of files or directories to a destination directory.
 // The destination path must exist.
 // The source paths must be relative. (Usually they are, as they are taken from an MD image tag)
-func copyFiles(dest string, srcpaths []string) (err error) {
+func copyFiles(dest string, srcpaths map[string]struct{}) (err error) {
 	var result []byte
-	for _, src := range srcpaths {
+	for src, _ := range srcpaths {
+		spew.Println("cp", "-R", path.Clean(strings.Trim(src, " \t")), path.Clean(path.Join(dest, src)))
 		result, err = exec.Command("cp", "-R", path.Clean(strings.Trim(src, " \t")), path.Clean(path.Join(dest, src))).Output() // TODO: Windows "copy"
 		if err != nil {
 			return errors.New(string(result) + "\n" + err.Error())
@@ -134,8 +127,26 @@ func extractMediaPath(line string) (path string, err error) {
 	if len(matches) == 1 {
 		return "", errors.New("Error: Found image tag but no valid path, in line:\n" + line)
 	}
-	return matches[1], nil
+	return strings.Trim(matches[1], " \t"), nil
 }
+
+// imageTag should properly match the following image tags:
+//
+// `![Alt text](gotomarkdown_animation.gif)`
+//
+// ![Alt text](gotomarkdown_animation.gif)
+//
+// `![Alt text](gotomarkdown_animation.gif "Title")`
+//
+// ![Alt text](gotomarkdown_animation.gif "Title")
+//
+// `![Alt text](gotomarkdown image.jpg)`
+//
+// ![Alt text](gotomarkdown image.jpg)
+//
+// `![Alt text](gotomarkdown image.jpg "Title")`
+//
+// ![Alt text](gotomarkdown image.jpg "Title")
 
 // getHTMLSnippet opens the file determined by `path`, and scans the file for the HTML
 // snippet to insert. It returns the HTML snippet.
@@ -189,13 +200,14 @@ func replaceHypeTag(line string) (out string, path string, err error) {
 // convert receives a string containing commented Go code and converts it
 // line by line into a Markdown document. Collect and return any media files
 // found during this process.
-func convert(in string) (out string, media []string, err error) {
+func convert(in string) (out string, media map[string]struct{}, err error) {
 	const (
 		neither = iota
 		comment
 		code
 	)
 	lastLine := neither
+	media = map[string]struct{}{}
 
 	// Remove carriage returns.
 	in = strings.Replace(in, "\r", "", -1)
@@ -219,7 +231,7 @@ func convert(in string) (out string, media []string, err error) {
 				return "", nil, errors.New("Unable to extract media path from line " + line + "\n" + err.Error())
 			}
 			if path != "" {
-				media = append(media, path)
+				media[path] = struct{}{}
 			}
 
 			repl, path, err := replaceHypeTag(line)
@@ -228,7 +240,7 @@ func convert(in string) (out string, media []string, err error) {
 			}
 			if repl != "" && path != "" {
 				out += repl
-				media = append(media, path)
+				media[path] = struct{}{}
 			} else {
 				// Strip out any comment delimiter and add the line to the output.
 				out += allCommentDelims.ReplaceAllString(line, "") + "\n"
@@ -254,7 +266,7 @@ func convert(in string) (out string, media []string, err error) {
 //
 // convertFile takes a file name, reads that file, converts it to
 // Markdown, and writes it to `*outDir/&lt;basename>.md
-func convertFile(filename string) (media []string, err error) {
+func convertFile(filename string) (media map[string]struct{}, err error) {
 	src, err := ioutil.ReadFile(filename)
 	if err != nil {
 		log.Fatal("Cannot read file " + filename + "\n" + err.Error())
