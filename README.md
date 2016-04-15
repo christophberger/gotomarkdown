@@ -14,10 +14,11 @@ Extra: A non-standard "Hype" tag can refer to Tumult Hype HTML animations. This 
 
 *`-outdir`: Specifies the output directory. Defaults to "out".
 *`-nocopy`: If set, the image and animation files do not get copied to the output directory. 
+*`-subdir`: If set, the image and animation files are copied into &lt;outdir>/&lt;subdir>, rather than into &lt;outdir>.
 
 ## License
 
-(c) Christoph Berger. All Rights Reserved. 
+(c) 2016 Christoph Berger. All Rights Reserved. 
 This code is governed by a BSD 3-clause license that can be found in LICENSE.txt.
 
 
