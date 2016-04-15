@@ -4,19 +4,20 @@
 title = "GoToMarkdown: Converting commented Go files to Markdown (plus some extras)"
 date = "2016-04-14"
 categories = ["tool"]
+tags = ["Go", "Hugo", "Markdown", "Hype"]
 +++
 
-# Usage
+## Usage
 
     gotomarkdown <gofile.go>
 
-# License
+## License
 
-See LICENSE.txt
+BSD 3-Clause License, see LICENSE.txt
 
 */
 
-// # Imports and Globals
+// ## Imports and Globals
 
 package main
 
@@ -51,10 +52,11 @@ var (
 	hypeTag          = regexp.MustCompile(hypePtrn)         // pattern for Hype animation tag
 	allCommentDelims = regexp.MustCompile(commentPtrn + "|" + commentStartPtrn + "|" + commentEndPtrn)
 	outDir           = flag.String("outdir", "out", "Output directory")
-	dontCopyPics     = flag.Bool("nocopy", false, "Do not copy images to outdir")
+	dontCopyMedia    = flag.Bool("nocopy", false, "Do not copy media files to outdir")
+	subDir           = flag.Bool("subdir", false, "Use subdirectory <outdir>/<gofilebasename>/ for media files, ex.: out/gotomarkdown/")
 )
 
-// # First, some helper functions
+// ## First, some helper functions
 //
 // copyFiles copies a list of files or directories to a destination directory.
 // The destination path must exist.
@@ -259,9 +261,31 @@ func convert(in string) (out string, media map[string]struct{}, err error) {
 	return out, media, nil
 }
 
-// # Converting a file
+// ## Converting a file
 //
-// convertFile takes a file name, reads that file, converts it to
+// ### Again, some helper functions
+//
+// `base` strips the extension from a filename. For some reason, this
+// function is missing from the standard path library.
+func base(name string) string {
+	return strings.TrimSuffix(name, filepath.Ext(name))
+}
+
+// `createPath` receives a path and creates all directories in that path
+// that are missing. Permissions are set to u+rwx go+r.
+func createPath(p string) (err error) {
+	if path.Clean(p) != "." {
+		err = os.MkdirAll(p, 0744) // -rwxr--r--
+		if err != nil {
+			return errors.New("Cannot create path: " + p + " - Error: " + err.Error())
+		}
+	}
+	return nil
+}
+
+// ### Now the actual conversion
+//
+// `convertFile` takes a file name, reads that file, converts it to
 // Markdown, and writes it to `*outDir/&lt;basename>.md
 func convertFile(filename string) (media map[string]struct{}, err error) {
 	src, err := ioutil.ReadFile(filename)
@@ -270,17 +294,15 @@ func convertFile(filename string) (media map[string]struct{}, err error) {
 	}
 	name := filepath.Base(filename)
 	ext := ".md"
-	basename := name[:len(name)-3] // strip ".go"
+	basename := base(name) // strip ".go"
 	outname := filepath.Join(*outDir, basename) + ext
 	md, media, err := convert(string(src))
 	if err != nil {
 		return nil, errors.New("Error converting " + filename + "\n" + err.Error())
 	}
-	if path.Clean(*outDir) != "." {
-		err = os.MkdirAll(*outDir, 0744) // -rwxr--r--
-		if err != nil {
-			return nil, errors.New("Cannot create path: " + *outDir + " - Error: " + err.Error())
-		}
+	err = createPath(*outDir)
+	if err != nil {
+		return nil, err // The error message from createPath is chatty enough.
 	}
 	err = ioutil.WriteFile(outname, []byte(md), 0644) // -rw-r--r--
 	if err != nil {
@@ -289,7 +311,7 @@ func convertFile(filename string) (media map[string]struct{}, err error) {
 	return media, nil
 }
 
-// # main
+// ## main - Where it all starts
 
 func main() {
 	flag.Parse()
@@ -297,13 +319,21 @@ func main() {
 		log.Println("Converting", filename)
 		media, err := convertFile(filename)
 		if err != nil {
-			log.Fatal("[Convert] " + err.Error())
+			log.Fatal("[Conversion Error] " + err.Error())
 		}
-		if media != nil && path.Clean(*outDir) != "." {
+		if *dontCopyMedia == false && media != nil && (path.Clean(*outDir) != "." || *subDir == true) {
 			log.Println("Copying media")
-			err := copyFiles(*outDir, media)
+			out := *outDir
+			if *subDir {
+				out = filepath.Join(*outDir, base(filename))
+				err := createPath(out)
+				if err != nil {
+					log.Fatal("[CopyMedia Error] Cannot create subdir for media files.\n" + err.Error())
+				}
+			}
+			err := copyFiles(out, media)
 			if err != nil {
-				log.Fatal("[CopyFiles] " + err.Error())
+				log.Fatal("[CopyMedia Error] cp failed:\n" + err.Error())
 			}
 		}
 	}
