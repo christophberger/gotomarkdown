@@ -10,7 +10,7 @@ tags = ["Go", "Hugo", "Markdown", "Hype"]
 
 `gotomarkdown` converts a .go file into a Markdown file. Comments can (and should) contain [Markdown](daringfireball.net/projects/markdown) text. Comment delimiters are stripped, and Go code is put into code fences.
 
-Extra: A non-standard "Hype" tag can refer to Tumult Hype HTML animations. This tag is replaced by the corresponding HTML snippet that loads the animation. Create the anmiation from Tumult Hype by exporting to HTML5, with the "Also save HTML file" checkbox checked. `gotomarkdown` can then extract the HTML snippet from the HTML file and can copy the `hyperesources` directory to the output folder.
+Extra: A non-standard "HYPE" tag can be used for inserting Tumult Hype HTML animations. This tag resembles an image tag but with the "!" replaced by "HYPE", like: `HYPE[Description](path/to/exported_hype.html)`. It is replaced by the corresponding HTML snippet that loads the animation. To create the anmiation files, export your Tumult Hype animation to HTML5 and ensure the "Also save HTML file" checkbox is checked. `gotomarkdown` then extracts the required HTML snippet from the file and copies the `hyperesources` directory to the output folder.
 
 <!--more-->
 
