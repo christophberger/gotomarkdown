@@ -1,3 +1,5 @@
+> Note: This repo is not maintained anymore. It is superseded by the `gotohugo` repo.
+
 # GoToMarkdown: Convert commented Go files to Markdown (plus an extra gimmick)
 
 ## Description
